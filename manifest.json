@@ -2,7 +2,7 @@
   "name": "Photo Organizer",
   "short_name": "PhotoOrg",
   "description": "Organize your photos into folders, tag them, and search effortlessly.",
-  "start_url": "/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#0D0D0D",
   "theme_color": "#E53935",

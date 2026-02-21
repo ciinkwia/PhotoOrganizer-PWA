@@ -1,13 +1,15 @@
-const CACHE_NAME = 'photo-organizer-v1';
+const CACHE_NAME = 'photo-organizer-v2';
+
+// Use relative paths so this works on any subdirectory (e.g. GitHub Pages)
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/css/styles.css',
-  '/js/db.js',
-  '/js/app.js',
-  '/manifest.json',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg'
+  './',
+  './index.html',
+  './css/styles.css',
+  './js/db.js',
+  './js/app.js',
+  './manifest.json',
+  './icons/icon-192.svg',
+  './icons/icon-512.svg'
 ];
 
 // Install: cache app shell
@@ -35,7 +37,7 @@ self.addEventListener('fetch', (e) => {
       return cached || fetch(e.request).catch(() => {
         // Offline fallback for navigation
         if (e.request.mode === 'navigate') {
-          return caches.match('/index.html');
+          return caches.match('./index.html');
         }
       });
     })
