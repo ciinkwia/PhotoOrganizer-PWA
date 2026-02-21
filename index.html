@@ -46,13 +46,32 @@
     <!-- Pages -->
     <div class="pages">
 
-      <!-- Gallery / Capture page -->
+      <!-- Capture / Session page -->
       <div class="page active" id="pageGallery">
-        <div class="empty-state" id="galleryEmpty">
-          <div class="empty-icon">📷</div>
-          <p>No photos yet.<br>Tap + to import photos from your device.</p>
+        <!-- Idle state: no session active -->
+        <div id="sessionIdle" class="session-idle">
+          <div class="session-idle-icon">📷</div>
+          <p class="session-idle-text">Tap Start to capture all new photos into one folder</p>
+          <button class="session-start-btn" id="btnSessionStart">Start Session</button>
         </div>
-        <div class="photo-grid" id="galleryGrid"></div>
+
+        <!-- Active state: session running -->
+        <div id="sessionActive" class="session-active hidden">
+          <div class="session-rec-bar">
+            <span class="rec-dot"></span>
+            <span class="rec-label">Recording to</span>
+            <span class="rec-folder-name" id="sessionFolderName"></span>
+          </div>
+          <div class="session-drop-zone" id="dropZone">
+            <div class="drop-zone-content">
+              <div class="drop-zone-icon">📥</div>
+              <p>Drag &amp; drop photos here<br>or tap + to import</p>
+            </div>
+          </div>
+          <div class="session-photo-count" id="sessionPhotoCount"></div>
+          <div class="photo-grid" id="sessionGrid"></div>
+          <button class="session-stop-btn" id="btnSessionStop">Stop Session</button>
+        </div>
       </div>
 
       <!-- Folders page -->
