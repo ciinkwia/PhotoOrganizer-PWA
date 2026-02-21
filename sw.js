@@ -1,4 +1,4 @@
-const CACHE_NAME = 'photo-organizer-v2';
+const CACHE_NAME = 'photo-organizer-v3';
 
 // Use relative paths so this works on any subdirectory (e.g. GitHub Pages)
 const ASSETS = [

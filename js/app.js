@@ -153,6 +153,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 /* ═══════════════════════════════════════════
  *  SESSION UI SETUP
  * ═══════════════════════════════════════════ */
+const cameraInput = $('#cameraInput');
+
 function setupSession() {
   $('#btnSessionStart').addEventListener('click', showSessionNameDialog);
   $('#btnSessionStop').addEventListener('click', () => {
@@ -162,6 +164,100 @@ function setupSession() {
       loadGallery();
     }, 'End session', 'Keep recording');
   });
+
+  /* ── Take Photo (camera) ── */
+  $('#btnTakePhoto').addEventListener('click', () => {
+    if (!SessionState.isActive()) { showSnack('Start a session first'); return; }
+    cameraInput.click();
+  });
+  cameraInput.addEventListener('change', async () => {
+    const files = Array.from(cameraInput.files).filter(f => f.type.startsWith('image/'));
+    if (files.length) await importToSession(files);
+    cameraInput.value = '';
+  });
+
+  /* ── Screenshot (Screen Capture API) ── */
+  $('#btnScreenshot').addEventListener('click', captureScreenshot);
+
+  /* ── Import files button ── */
+  $('#btnImportFiles').addEventListener('click', () => {
+    if (!SessionState.isActive()) { showSnack('Start a session first'); return; }
+    fileInput.click();
+  });
+
+  /* ── Clipboard paste (Ctrl+V for screenshots) ── */
+  document.addEventListener('paste', handlePaste);
+}
+
+/** Capture a screenshot using getDisplayMedia → canvas → blob */
+async function captureScreenshot() {
+  if (!SessionState.isActive()) { showSnack('Start a session first'); return; }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    showSnack('Screenshots not supported in this browser');
+    return;
+  }
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'monitor' } });
+  } catch (e) {
+    // User cancelled the picker
+    if (e.name !== 'AbortError') showSnack('Screenshot cancelled');
+    return;
+  }
+
+  try {
+    const track = stream.getVideoTracks()[0];
+    // Wait a frame for the stream to produce content
+    const imageCapture = new ImageCapture(track);
+    const bitmap = await imageCapture.grabFrame();
+    track.stop(); // Stop sharing immediately
+
+    // Draw to canvas and export as blob
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0);
+    bitmap.close();
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+    const file = new File([blob], `Screenshot_${timestamp}.png`, { type: 'image/png' });
+    await importToSession([file]);
+  } catch (e) {
+    stream.getTracks().forEach(t => t.stop());
+    showSnack('Failed to capture screenshot');
+    console.error('Screenshot error:', e);
+  }
+}
+
+/** Handle paste events — auto-import pasted images into active session */
+async function handlePaste(e) {
+  if (!SessionState.isActive()) return; // Ignore paste when no session
+  // Don't intercept if user is typing in an input field
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  const items = Array.from(e.clipboardData?.items || []);
+  const imageItems = items.filter(item => item.type.startsWith('image/'));
+  if (!imageItems.length) return;
+
+  e.preventDefault();
+  const files = [];
+  for (const item of imageItems) {
+    const blob = item.getAsFile();
+    if (blob) {
+      const now = new Date();
+      const timestamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+      const file = new File([blob], `Pasted_${timestamp}.png`, { type: blob.type });
+      files.push(file);
+    }
+  }
+  if (files.length) {
+    await importToSession(files);
+    showSnack(`📋 Pasted ${files.length} image${files.length > 1 ? 's' : ''} into session`);
+  }
 }
 
 function showSessionNameDialog() {
@@ -221,6 +317,20 @@ function setupDragDrop() {
   });
   dropZone.addEventListener('click', () => {
     if (SessionState.isActive()) fileInput.click();
+  });
+
+  /* ── Also listen for global drag-drop anywhere on page during active session ── */
+  document.addEventListener('dragover', (e) => {
+    if (!SessionState.isActive()) return;
+    e.preventDefault();
+  });
+  document.addEventListener('drop', async (e) => {
+    if (!SessionState.isActive()) return;
+    // Only handle if not caught by the drop zone itself
+    if (e.target === dropZone || dropZone.contains(e.target)) return;
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (files.length) await importToSession(files);
   });
 }
 

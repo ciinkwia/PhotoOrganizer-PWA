@@ -554,6 +554,37 @@ html, body {
 .rec-label { font-size: 13px; color: var(--on-surface-variant); }
 .rec-folder-name { font-size: 14px; font-weight: 600; color: var(--on-surface); }
 
+/* Capture action buttons row */
+.capture-actions {
+  display: flex; gap: 8px;
+}
+.capture-btn {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px;
+  padding: 14px 8px;
+  border-radius: var(--radius);
+  background: var(--surface-variant);
+  border: 1px solid var(--outline);
+  color: var(--on-surface);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.capture-btn:hover { background: #252525; border-color: var(--primary); }
+.capture-btn:active { transform: scale(.96); }
+.capture-btn-icon { font-size: 24px; line-height: 1; }
+
+.capture-hint {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 12px; color: var(--on-surface-variant);
+  padding: 6px 12px;
+  background: rgba(229,57,53,.06);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(229,57,53,.15);
+}
+
 .session-drop-zone {
   border: 2px dashed var(--outline);
   border-radius: var(--radius);

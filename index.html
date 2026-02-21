@@ -51,7 +51,7 @@
         <!-- Idle state: no session active -->
         <div id="sessionIdle" class="session-idle">
           <div class="session-idle-icon">📷</div>
-          <p class="session-idle-text">Tap Start to capture all new photos into one folder</p>
+          <p class="session-idle-text">Start a session to capture photos, screenshots, and downloads into one folder</p>
           <button class="session-start-btn" id="btnSessionStart">Start Session</button>
         </div>
 
@@ -62,10 +62,31 @@
             <span class="rec-label">Recording to</span>
             <span class="rec-folder-name" id="sessionFolderName"></span>
           </div>
+
+          <!-- Quick-capture action row -->
+          <div class="capture-actions" id="captureActions">
+            <button class="capture-btn" id="btnTakePhoto">
+              <span class="capture-btn-icon">📸</span>
+              <span>Take Photo</span>
+            </button>
+            <button class="capture-btn" id="btnScreenshot">
+              <span class="capture-btn-icon">🖥</span>
+              <span>Screenshot</span>
+            </button>
+            <button class="capture-btn" id="btnImportFiles">
+              <span class="capture-btn-icon">📁</span>
+              <span>Import</span>
+            </button>
+          </div>
+
+          <div class="capture-hint" id="captureHint">
+            <span>💡</span> Paste screenshots with Ctrl+V &nbsp;·&nbsp; Drag &amp; drop images below
+          </div>
+
           <div class="session-drop-zone" id="dropZone">
             <div class="drop-zone-content">
               <div class="drop-zone-icon">📥</div>
-              <p>Drag &amp; drop photos here<br>or tap + to import</p>
+              <p>Drag &amp; drop images here</p>
             </div>
           </div>
           <div class="session-photo-count" id="sessionPhotoCount"></div>
@@ -187,8 +208,9 @@
     <!-- Context menu (reusable) -->
     <div class="context-menu" id="contextMenu"></div>
 
-    <!-- Hidden file input -->
+    <!-- Hidden file inputs -->
     <input type="file" id="fileInput" accept="image/*" multiple hidden>
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
   </div>
 
   <script src="js/db.js"></script>
