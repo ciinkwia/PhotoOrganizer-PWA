@@ -148,6 +148,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupSession();
   setupDragDrop();
   loadPage('gallery');
+
+  // Check for incoming shared files (from Web Share Target API)
+  await processShareInbox();
 });
 
 /* ═══════════════════════════════════════════
@@ -176,67 +179,19 @@ function setupSession() {
     cameraInput.value = '';
   });
 
-  /* ── Screenshot (Screen Capture API) ── */
-  $('#btnScreenshot').addEventListener('click', captureScreenshot);
-
   /* ── Import files button ── */
   $('#btnImportFiles').addEventListener('click', () => {
     if (!SessionState.isActive()) { showSnack('Start a session first'); return; }
     fileInput.click();
   });
 
-  /* ── Clipboard paste (Ctrl+V for screenshots) ── */
+  /* ── Clipboard paste (Ctrl+V for screenshots on desktop) ── */
   document.addEventListener('paste', handlePaste);
-}
-
-/** Capture a screenshot using getDisplayMedia → canvas → blob */
-async function captureScreenshot() {
-  if (!SessionState.isActive()) { showSnack('Start a session first'); return; }
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-    showSnack('Screenshots not supported in this browser');
-    return;
-  }
-
-  let stream;
-  try {
-    stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'monitor' } });
-  } catch (e) {
-    // User cancelled the picker
-    if (e.name !== 'AbortError') showSnack('Screenshot cancelled');
-    return;
-  }
-
-  try {
-    const track = stream.getVideoTracks()[0];
-    // Wait a frame for the stream to produce content
-    const imageCapture = new ImageCapture(track);
-    const bitmap = await imageCapture.grabFrame();
-    track.stop(); // Stop sharing immediately
-
-    // Draw to canvas and export as blob
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    canvas.getContext('2d').drawImage(bitmap, 0, 0);
-    bitmap.close();
-
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    const now = new Date();
-    const timestamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
-    const file = new File([blob], `Screenshot_${timestamp}.png`, { type: 'image/png' });
-    await importToSession([file]);
-  } catch (e) {
-    stream.getTracks().forEach(t => t.stop());
-    showSnack('Failed to capture screenshot');
-    console.error('Screenshot error:', e);
-  }
 }
 
 /** Handle paste events — auto-import pasted images into active session */
 async function handlePaste(e) {
-  if (!SessionState.isActive()) return; // Ignore paste when no session
-  // Don't intercept if user is typing in an input field
+  if (!SessionState.isActive()) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
   const items = Array.from(e.clipboardData?.items || []);
@@ -249,15 +204,100 @@ async function handlePaste(e) {
     const blob = item.getAsFile();
     if (blob) {
       const now = new Date();
-      const timestamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
-      const file = new File([blob], `Pasted_${timestamp}.png`, { type: blob.type });
-      files.push(file);
+      const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+      files.push(new File([blob], `Pasted_${ts}.png`, { type: blob.type }));
     }
   }
   if (files.length) {
     await importToSession(files);
-    showSnack(`📋 Pasted ${files.length} image${files.length > 1 ? 's' : ''} into session`);
+    showSnack(`Pasted ${files.length} image${files.length > 1 ? 's' : ''} into session`);
   }
+}
+
+/* ═══════════════════════════════════════════
+ *  WEB SHARE TARGET – Inbox Processing
+ *  When the user shares an image TO this PWA
+ *  from their phone's gallery/screenshot/downloads,
+ *  the service worker stashes it in a separate
+ *  IndexedDB ("PhotoOrgShareInbox"). On app load
+ *  we drain that inbox into the active session.
+ * ═══════════════════════════════════════════ */
+function _openShareInboxDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('PhotoOrgShareInbox', 1);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('inbox')) {
+        db.createObjectStore('inbox', { autoIncrement: true });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function processShareInbox() {
+  let db;
+  try {
+    db = await _openShareInboxDB();
+  } catch { return; }
+
+  // Read all items from the inbox
+  const items = await new Promise((resolve, reject) => {
+    const tx = db.transaction('inbox', 'readonly');
+    const store = tx.objectStore('inbox');
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+
+  if (!items || items.length === 0) {
+    // Clean the ?share=pending param from URL if present
+    if (window.location.search.includes('share=pending')) {
+      history.replaceState(null, '', window.location.pathname);
+    }
+    return;
+  }
+
+  // If no session is active, auto-start one for the shared files
+  if (!SessionState.isActive()) {
+    const sessionNum = SessionState.getNextSessionNumber();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const folderName = `Session ${sessionNum} - ${timeStr} - Today`;
+    let folderId;
+    const exists = await FolderDB.nameExists(folderName);
+    if (exists) {
+      folderId = await FolderDB.create(`${folderName} (${Date.now()})`);
+    } else {
+      folderId = await FolderDB.create(folderName);
+    }
+    SessionState.start(folderId, folderName);
+  }
+
+  // Convert inbox items to File objects and import
+  const files = items.map(item =>
+    new File([item.blob], item.name, { type: item.type })
+  );
+
+  const folderId = SessionState.getFolderId();
+  await PhotoDB.importPhotos(files, folderId);
+
+  // Clear the inbox
+  const clearTx = db.transaction('inbox', 'readwrite');
+  clearTx.objectStore('inbox').clear();
+  await new Promise((resolve) => { clearTx.oncomplete = resolve; });
+
+  db.close();
+
+  // Clean URL param
+  if (window.location.search.includes('share=pending')) {
+    history.replaceState(null, '', window.location.pathname);
+  }
+
+  showSnack(`${files.length} shared image${files.length > 1 ? 's' : ''} added to session`);
+
+  // Navigate to capture page to show the result
+  navigateTo('gallery');
 }
 
 function showSessionNameDialog() {

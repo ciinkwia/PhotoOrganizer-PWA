@@ -577,12 +577,33 @@ html, body {
 .capture-btn-icon { font-size: 24px; line-height: 1; }
 
 .capture-hint {
-  display: flex; align-items: center; justify-content: center; gap: 4px;
-  font-size: 12px; color: var(--on-surface-variant);
-  padding: 6px 12px;
+  font-size: 13px; color: var(--on-surface-variant);
+  padding: 10px 14px;
   background: rgba(229,57,53,.06);
   border-radius: var(--radius-sm);
   border: 1px solid rgba(229,57,53,.15);
+  text-align: center; line-height: 1.4;
+}
+.capture-hint strong { color: var(--primary); }
+
+/* Share how-to steps */
+.share-how-to {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.share-step {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-variant);
+  border-radius: var(--radius-sm);
+  font-size: 13px; color: var(--on-surface);
+}
+.share-step strong { color: var(--primary); }
+.share-step-num {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff; font-size: 12px; font-weight: 700;
 }
 
 .session-drop-zone {
